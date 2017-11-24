@@ -5,15 +5,24 @@ import org.apache.commons.lang3.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 public class ProxyApplication {
 
 	private static final String END_LINE = "\n";
+
+	private static final byte[] SERVER_ERROR = "HTTP/1.0 500 Server Error\r\nConnection: close\r\n\r\n".getBytes();
 
 	public static void main(String[] args) {
 		if (args.length < 1) {
@@ -30,13 +39,49 @@ public class ProxyApplication {
 							new InputStreamReader(clientSocket.getInputStream()));
 					OutputStream outputStream = clientSocket.getOutputStream();
 
-					String s;
-					while (!StringUtils.isEmpty((s = in.readLine()))) {
-						outputStream.write(s.getBytes());
-						outputStream.write(END_LINE.getBytes());
-						outputStream.flush();
+					String line;
+					List<String> headerLines = new ArrayList<>();
+					while (!StringUtils.isEmpty((line = in.readLine()))) {
+						headerLines.add(line);
 					}
-					clientSocket.close();
+
+					try {
+						ParsedRequest parsedRequest = RequestParser.parseHeader(headerLines);
+						String domainPlusPort = parsedRequest.url();
+						String[] domainAndPort = domainPlusPort.split(":");
+						String remoteDomain;
+						int remotePort;
+						if (domainAndPort.length == 1) {
+							remotePort = 80;
+						} else {
+							remotePort = Integer.parseInt(domainAndPort[1]);
+						}
+						remoteDomain = domainAndPort[0];
+						Socket remoteSocket = new Socket(remoteDomain, remotePort);
+						remoteSocket.getOutputStream().write(parsedRequest.fullRequest().getBytes());
+
+						InputStream stream =
+								remoteSocket.getInputStream();
+
+
+						byte[] buffer = new byte[5000];
+
+						int read = stream.read(buffer, 0, 4999);
+						while (read > 0) {
+							outputStream.write(buffer, 0, read);
+							read = stream.read(buffer, 0, 4999);
+						}
+
+						remoteSocket.close();
+
+
+					} catch (IllegalArgumentException e) {
+						clientSocket.getOutputStream().write(SERVER_ERROR);
+					} finally {
+						if (!clientSocket.isClosed()) {
+							clientSocket.close();
+						}
+					}
 				}
 			} catch (IOException e) {
 				log.debug("", e);
@@ -45,6 +90,15 @@ public class ProxyApplication {
 				System.err.println("Port argument must be integer but was: " + portString);
 			}
 		}
-  }
+    }
 
+	private  static byte[] toBytes(char[] chars) {
+		CharBuffer charBuffer = CharBuffer.wrap(chars);
+		ByteBuffer byteBuffer = Charset.forName("UTF-8").encode(charBuffer);
+		byte[] bytes = Arrays.copyOfRange(byteBuffer.array(),
+				byteBuffer.position(), byteBuffer.limit());
+		Arrays.fill(charBuffer.array(), '\u0000'); // clear sensitive data
+		Arrays.fill(byteBuffer.array(), (byte) 0); // clear sensitive data
+		return bytes;
+	}
 }
