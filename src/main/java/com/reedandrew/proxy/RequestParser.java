@@ -57,7 +57,6 @@ public abstract class RequestParser {
             finalHeader.append("\r\n");
 
         } else {
-            log.error(lines.stream().collect(Collectors.joining("\n")));
             throw new IllegalArgumentException("Header not formatted correctly!");
         }
 
