@@ -21,8 +21,6 @@ import java.util.List;
 @Slf4j
 public class ProxyApplication {
 
-	private static final String END_LINE = "\n";
-
 	private static final byte[] SERVER_ERROR = "HTTP/1.0 500 Server Error\r\nConnection: close\r\n\r\n".getBytes();
 
 	public static void main(String[] args) {
@@ -94,14 +92,4 @@ public class ProxyApplication {
 			}
 		}
     }
-
-	private  static byte[] toBytes(char[] chars) {
-		CharBuffer charBuffer = CharBuffer.wrap(chars);
-		ByteBuffer byteBuffer = Charset.forName("UTF-8").encode(charBuffer);
-		byte[] bytes = Arrays.copyOfRange(byteBuffer.array(),
-				byteBuffer.position(), byteBuffer.limit());
-		Arrays.fill(charBuffer.array(), '\u0000'); // clear sensitive data
-		Arrays.fill(byteBuffer.array(), (byte) 0); // clear sensitive data
-		return bytes;
-	}
 }
