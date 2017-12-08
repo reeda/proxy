@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
@@ -77,6 +78,8 @@ public class ProxyApplication {
 
 					} catch (IllegalArgumentException e) {
 						clientSocket.getOutputStream().write(SERVER_ERROR);
+					} catch (SocketException e) {
+						log.error("Socket Exception: {}", headerLines);
 					} finally {
 						if (!clientSocket.isClosed()) {
 							clientSocket.close();
